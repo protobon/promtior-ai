@@ -1,5 +1,7 @@
 from dotenv import load_dotenv
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.schema.document import Document
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 from os import path
@@ -8,8 +10,13 @@ from bs4 import BeautifulSoup
 
 load_dotenv()
 
+# Define the db persistent directory
+current_dir = path.dirname(path.abspath(__file__))
+db_dir = path.join(current_dir, "db")
+persistent_directory = path.join(db_dir, "promtior")
 
-def fetch_page_content(url):
+
+def fetch_page_content(url: str) -> str:
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -18,12 +25,12 @@ def fetch_page_content(url):
     return "\n".join([element.get_text(strip=True) for element in text_elements])
 
 
-# Define the db persistent directory
-current_dir = path.dirname(path.abspath(__file__))
-db_dir = path.join(current_dir, "db")
-persistent_directory = path.join(db_dir, "promtior")
+def load_pdf(fp: str) -> Document:
+    loader = PyPDFLoader(fp)
+    return loader.load()[2]  # only page 2 has relevant information
 
-if not path.exists(persistent_directory):
+
+def populate_database():
     # Urls to scrape relevant data from
     urls = [
         "https://www.promtior.ai/",
@@ -41,26 +48,19 @@ if not path.exists(persistent_directory):
         docs = text_splitter.create_documents([content])
         print("\n--- Document Chunks Information ---")
         print(f"Number of document chunks: {len(docs)}")
-        print(f"Sample chunk:\n{docs[0].page_content}\n")
         documents.extend(docs)
+
+    # append data from pdf file
+    pdf_path = path.join(current_dir, "data", "promtior.pdf")
+    if path.exists(pdf_path):
+        print(f"\n--- Loading content from {pdf_path} ---")
+        pdf_doc = load_pdf(pdf_path)
+        documents.append(pdf_doc)
+
     print("\n------\n")
     print(f"\n--- Saving {len(documents)} documents to db ---")
-    db = Chroma.from_documents(documents, embedding=OpenAIEmbeddings(), persist_directory=persistent_directory)
-else:
-    print("\n--- Persistent Directory Found ---")
-    db = Chroma(persist_directory=persistent_directory, embedding_function=OpenAIEmbeddings())
+    Chroma.from_documents(documents, embedding=OpenAIEmbeddings(), persist_directory=persistent_directory)
 
 
-# Create a retriever for querying the vector store
-retriever = db.as_retriever(
-    search_type="similarity",
-    search_kwargs={"k": 3},
-)
-
-query = "What is promtio.ai's contact number?"
-
-results = retriever.invoke(query)
-
-print("\n--- Relevant Documents ---")
-for i, doc in enumerate(results):
-    print(f"--- Document {i} ---\n{doc.page_content}\n")
+if __name__ == "__main__":
+    populate_database()
