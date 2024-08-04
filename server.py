@@ -2,7 +2,8 @@ from os import path
 from operator import itemgetter
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from langchain_community.vectorstores import Chroma
+from fastapi.responses import RedirectResponse
+from langchain_chroma import Chroma
 from langchain_core.runnables import RunnableMap, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate, format_document
 from langchain_core.output_parsers import StrOutputParser
@@ -117,6 +118,12 @@ app = FastAPI(
     description="Chatbot that uses RAG to answer questions about the company Promtior.ai"
 )
 
+
+@app.get("/")
+async def home():
+    """ Redirect to chat playground """
+    return RedirectResponse(url="/promtior/playground")
+
 add_routes(
     app,
     conversational_qa_chain,
@@ -125,4 +132,4 @@ add_routes(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="localhost", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
