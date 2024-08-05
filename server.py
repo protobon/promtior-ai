@@ -124,6 +124,12 @@ async def home():
     """ Redirect to chat playground """
     return RedirectResponse(url="/promtior/playground")
 
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+
 add_routes(
     app,
     conversational_qa_chain,
